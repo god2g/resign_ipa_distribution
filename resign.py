@@ -47,7 +47,7 @@ VERSION_NUMBER = '1.0'
 
 
 
-def do_resign(ipa_file, provision_file, dest_file):
+def do_resign(ipa_file, provision_file, dest_file, suffix_bundle_id):
     # check whether Distribution mobileprovision
     provision_xml_rx = re.compile(r'<\?xml.+</plist>', re.DOTALL)
     provision_fh = open(provision_file, 'rb')
@@ -124,7 +124,7 @@ def do_resign(ipa_file, provision_file, dest_file):
         xcent_fh.flush()
         xcent_fh.close()
     except Exception, e:
-        print_and_close(-9012, 'write xcent file failed: %s' % e.message)
+			print_and_close(-9012, 'write xcent file failed: %s' % e.message)
 
     # unzip ipa
     os.chdir(work_path)
@@ -211,7 +211,7 @@ def do_resign(ipa_file, provision_file, dest_file):
             for plugin_name in plugins:
                 if regx.match(plugin_name):
                     plugin_path = os.path.join(plugin_in_app, plugin_name)
-                    resign_app_path(plugin_path, bundleid, provision_file, signature, xcent_fd, 'appex')
+                    resign_app_path(plugin_path, bundleid, provision_file, signature, xcent_fd, 'appex', suffix_bundle_id)
 
                     # check whether there is a app directory -- for watch kit app
                     try:
@@ -220,7 +220,7 @@ def do_resign(ipa_file, provision_file, dest_file):
                         for sub_in_plugin in subs_in_plugin_path:
                             if regx2.match(sub_in_plugin):
                                 wkapp_path = os.path.join(plugin_path, sub_in_plugin)
-                                resign_app_path(wkapp_path, bundleid, provision_file, signature, xcent_fd, 'wkapp')
+                                resign_app_path(wkapp_path, bundleid, provision_file, signature, xcent_fd, 'wkapp', suffix_bundle_id)
                     except Exception, e2:
                         print_and_close(-9024, 'codesign watchkit app failed: %s' % e2.message)
 
@@ -228,7 +228,7 @@ def do_resign(ipa_file, provision_file, dest_file):
         print_and_close(-9023, 'codesign plugin failed: %s' % e.message)
 
     # resign the main app
-    resign_app_path(ipa_app_path, bundleid, provision_file, signature, xcent_fd, 'app')
+    resign_app_path(ipa_app_path, bundleid, provision_file, signature, xcent_fd, 'app', suffix_bundle_id)
 
 
     # zip to a ipa
@@ -242,13 +242,14 @@ def do_resign(ipa_file, provision_file, dest_file):
     print_and_close(0, 'resigned success and save ipa to %s' % dest_file)
 # end do_resign
 
-def resign_app_path(app_path, app_bundle_id, provision_file, sign_signature, xcent_file, app_type):
+def resign_app_path(app_path, app_bundle_id, provision_file, sign_signature, xcent_file, app_type, suffix_bundle_id):
     bundle_id = app_bundle_id
     if app_type == 'appex':
-        bundle_id = '%s.appex' % bundle_id
+        bundle_id = '%s.%s.appex' % (bundle_id, suffix_bundle_id)
     elif app_type == 'wkapp':
-        bundle_id = '%s.wkapp' % bundle_id
-
+        bundle_id = '%s.%s.wkapp' % (bundle_id, suffix_bundle_id)
+    elif app_type == 'app':
+        bundle_id = '%s.%s' % (bundle_id, suffix_bundle_id)
     # modify bundleid in Info.plist
     try:
         plist_fd = os.path.join(app_path, 'Info.plist')
@@ -394,8 +395,9 @@ Error numbers in json formatted output as follow:
                     help='Specified mobileprovision filename')
     optp.add_option('-d', '--destination', action='store', dest='dest_file',
                     help='Specified filenae which resigned ipa is saved. If not set, the resigned ipa will be saved as xxx-resigend.ipa in original directory')
+    optp.add_option('-s', '--suffixbundleid', action='store', dest='suffixbundleid', help='Specified suffix bundle id')
 
-    optp.set_usage('checkipa -i <ipa filename> -p <provision filename>]')
+    optp.set_usage('checkipa -i <ipa filename> -p <provision filename> -s <suffix bundle id>')
 
     opts_args = optp.parse_args()
     return opts_args[0]
@@ -419,6 +421,7 @@ def main():
     ipa_file = os.path.abspath(options.ipa_file)
     provision_file = os.path.abspath(options.provision_file)
     dest_file = options.dest_file
+    suffix_bundle_id = options.suffixbundleid
 
     errors = []
 
@@ -461,7 +464,9 @@ def main():
 
 
 
-    do_resign(ipa_file, provision_file, dest_file)
+
+
+    do_resign(ipa_file, provision_file, dest_file, suffix_bundle_id)
 
 # end main()
 
